@@ -1,10 +1,10 @@
 .. _data_structure_mod:
 
-The ``data_structures`` sub module
-**********************************
+Data Structures
+===============
 
 Introduction
-============
+------------
 
 The majority of the data structures in this module are used to represent the
 metadata for music items, such as music tracks, genres and playlists. The data
@@ -155,4 +155,3 @@ DidlContainer
    :members:
    :special-members:
    :show-inheritance:
-

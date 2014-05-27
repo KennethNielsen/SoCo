@@ -31,7 +31,7 @@ There are different ways of running the unit tests. The easiest is to use ``py.t
 .. code-block:: sh
 
 	py.test
-	
+
 For others, see the `py.test documentation <http://pytest.org/latest/usage.html>`_
 
 .. note:: To run the unittests in this way, the soco package must be
@@ -166,7 +166,7 @@ etc. should be restored after the testing is complete.
 Add a new unit test module (for a new class under test)
 =======================================================
 
-To add unit tests for the methods in a new class follow the steps below: 
+To add unit tests for the methods in a new class follow the steps below:
 
 1. Make a new file in the unit test folder named as mentioned in
    section :ref:`section_one_module_per_class`.
@@ -196,7 +196,7 @@ the file ``execute_unittests.py``.:
    where both the new imaginary ``foo_bar`` entry and the existing
    ``soco`` entry are shown for clarity. The arguments dict is what will be
    passed on to the ``init`` method, see section
-   :ref:`section_init_function`. 
+   :ref:`section_init_function`.
 3. Lastly, add the new module to the help text for the ``modules``
    command line argument, defined in the ``__build_option_parser``
    function::
