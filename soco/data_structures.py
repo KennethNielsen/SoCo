@@ -36,7 +36,10 @@ def get_ms_item(xml, service, parent_id):
     """Return the music service item that corresponds to xml. The class is
     identified by getting the type from the 'itemType' tag
     """
-    cls = MS_TYPE_TO_CLASS.get(xml.findtext(ns_tag('ms', 'itemType')))
+    item_type = xml.findtext(ns_tag('ms', 'itemType'))
+    #print 'Item_type:', item_type
+    cls = MS_TYPE_TO_CLASS[item_type]
+    #print 'Class:', cls
     out = cls.from_xml(xml, service, parent_id)
     return out
 
@@ -53,8 +56,12 @@ def tags_with_text(xml, tags=None):
         elif len(element) > 0:
             tags_with_text(element, tags)
         else:
-            message = 'Unknown XML structure: {0}'.format(element)
-            raise ValueError(message)
+            # An item that has no text and no children is a single element
+            # We add those as well
+            tags.append(element)
+            #pass
+            #message = 'Unknown XML structure: {0}'.format(element)
+            #raise ValueError(message)
     return tags
 
 
@@ -857,7 +864,6 @@ class MusicServiceItem(MusicInfoItem):
 
     # These fields must be overwritten in the sub classes
     item_class = None
-    valid_fields = None
     required_fields = None
 
     def __init__(self, **kwargs):
@@ -923,18 +929,13 @@ class MusicServiceItem(MusicInfoItem):
         for item in all_text_elements:
             tag = item.tag[len(NS['ms']) + 2:]  # Strip namespace
             tag = camel_to_underscore(tag)  # Convert to nice names
-            if tag not in cls.valid_fields:
-                message = 'The info tag \'{0}\' is not allowed for this item'.\
-                    format(tag)
-                raise ValueError(message)
             content[tag] = item.text
 
         # Convert values for known types
         for key, value in content.items():
             if key == 'duration':
                 content[key] = int(value)
-            if key in ['can_play', 'can_skip', 'can_add_to_favorites',
-                       'can_enumerate']:
+            if key.startswith('can_'):
                 content[key] = True if value == 'true' else False
         # Rename a single item
         content['item_id'] = content.pop('id')
@@ -951,6 +952,7 @@ class MusicServiceItem(MusicInfoItem):
             if key not in content:
                 message = 'An XML field that correspond to the key \'{0}\' '\
                     'is required. See the docstring for help.'.format(key)
+                raise ValueError(message)
 
         return cls.from_dict(content)
 
@@ -1026,7 +1028,7 @@ class MusicServiceItem(MusicInfoItem):
         item_attrib = {
             'parentID': '',
             'restricted': 'true',
-            'id': self.extended_id
+            'id': self.extended_id#.replace(':', '%3a')
         }
         # Only add the parent_id if we have it
         if self.parent_id:
@@ -1086,12 +1088,6 @@ class MSTrack(MusicServiceItem):
     """Class that represents a music service track"""
 
     item_class = 'object.item.audioItem.musicTrack'
-    valid_fields = [
-        'album', 'can_add_to_favorites', 'artist', 'album_artist_id', 'title',
-        'album_id', 'album_art_uri', 'album_artist', 'composer_id',
-        'item_type', 'composer', 'duration', 'can_skip', 'artist_id',
-        'can_play', 'id', 'mime_type', 'description'
-    ]
     # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
     required_fields = ['title', 'item_id', 'extended_id', 'uri', 'description',
                        'service_id']
@@ -1132,11 +1128,6 @@ class MSAlbum(MusicServiceItem):
     """Class that represents a Music Service Album"""
 
     item_class = 'object.container.album.musicAlbum'
-    valid_fields = [
-        'username', 'can_add_to_favorites', 'artist', 'title', 'album_art_uri',
-        'can_play', 'item_type', 'service_id', 'id', 'description',
-        'can_cache', 'artist_id', 'can_skip'
-    ]
     # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
     required_fields = ['title', 'item_id', 'extended_id', 'uri', 'description',
                        'service_id']
@@ -1166,10 +1157,6 @@ class MSAlbumList(MusicServiceItem):
     """Class that represents a Music Service Album List"""
 
     item_class = 'object.container.albumlist'
-    valid_fields = [
-        'id', 'title', 'item_type', 'artist', 'artist_id', 'can_play',
-        'can_enumerate', 'can_add_to_favorites', 'album_art_uri', 'can_cache'
-    ]
     # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
     required_fields = ['title', 'item_id', 'extended_id', 'uri', 'description',
                        'service_id']
@@ -1195,9 +1182,6 @@ class MSPlaylist(MusicServiceItem):
     """Class that represents a Music Service Play List"""
 
     item_class = 'object.container.albumlist'
-    valid_fields = ['id', 'item_type', 'title', 'can_play', 'can_cache',
-                    'album_art_uri', 'artist', 'can_enumerate',
-                    'can_add_to_favorites', 'artist_id']
     # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
     required_fields = ['title', 'item_id', 'extended_id', 'uri', 'description',
                        'service_id']
@@ -1223,7 +1207,6 @@ class MSArtistTracklist(MusicServiceItem):
     """Class that represents a Music Service Artist Track List"""
 
     item_class = 'object.container.playlistContainer.sameArtist'
-    valid_fields = ['id', 'title', 'item_type', 'can_play', 'album_art_uri']
     # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
     required_fields = ['title', 'item_id', 'extended_id', 'uri', 'description',
                        'service_id']
@@ -1241,16 +1224,38 @@ class MSArtistTracklist(MusicServiceItem):
     def uri(self):
         """Return the URI"""
         # x-rincon-cpcontainer:100f006cartistpopsongsid_1566
-        return 'x-rincon-cpcontainer:100f006c{0}'.format(self.item_id)
+        return self.content['uri']        
+        #return 'x-rincon-cpcontainer:100f006c{0}'.format(self.item_id)
+
+
+#FIXME NEW
+class MSTracklist(MusicServiceItem):
+    """Class that represents a Music Service Track List"""
+    
+    item_class = 'object.container.playlistContainer'  # Confirmed
+
+    # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
+    required_fields = ['title', 'item_id', 'extended_id', 'service_id']
+
+    def __init__(self, title, item_id, extended_id, service_id, **kwargs):
+        content = {
+            'title': title, 'item_id': item_id, 'extended_id': extended_id,
+            'service_id': service_id,
+        }
+        content.update(kwargs)
+        super(MSTracklist, self).__init__(**content)
+
+    @property
+    def uri(self):
+        """Return the URI"""
+        # x-rincon-cpcontainer:100f006cartistpopsongsid_1566
+        return self.content['uri']
+        #return 'x-rincon-cpcontainer:000e006c{0}'.format(self.item_id)
 
 
 class MSArtist(MusicServiceItem):
     """Class that represents a Music Service Artist"""
 
-    valid_fields = [
-        'username', 'can_add_to_favorites', 'artist', 'title', 'album_art_uri',
-        'item_type', 'id', 'service_id', 'description', 'can_cache'
-    ]
     # Since MSArtist cannot produce didl_metadata, they are not strictly
     # required, but it makes sense to require them anyway, since they are the
     # fields that that describe the item
@@ -1267,8 +1272,6 @@ class MSArtist(MusicServiceItem):
 class MSFavorites(MusicServiceItem):
     """Class that represents a Music Service Favorite"""
 
-    valid_fields = ['id', 'item_type', 'title', 'can_play', 'can_cache',
-                    'album_art_uri']
     # Since MSFavorites cannot produce didl_metadata, they are not strictly
     # required, but it makes sense to require them anyway, since they are the
     # fields that that describe the item
@@ -1285,8 +1288,6 @@ class MSFavorites(MusicServiceItem):
 class MSCollection(MusicServiceItem):
     """Class that represents a Music Service Collection"""
 
-    valid_fields = ['id', 'item_type', 'title', 'can_play', 'can_cache',
-                    'album_art_uri']
     # Since MSCollection cannot produce didl_metadata, they are not strictly
     # required, but it makes sense to require them anyway, since they are the
     # fields that that describe the item
@@ -1298,6 +1299,57 @@ class MSCollection(MusicServiceItem):
                    'extended_id': extended_id, 'service_id': service_id}
         content.update(kwargs)
         super(MSCollection, self).__init__(**content)
+
+
+# FIXME NEW
+class MSContainer(MusicServiceItem):
+    """Class that represents a Music Service Container"""
+
+    # Since MSContainer cannot produce didl_metadata, they are not strictly
+    # required, but it makes sense to require them anyway, since they are the
+    # fields that that describe the item
+    # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
+    required_fields = ['title', 'item_id', 'extended_id', 'service_id']
+
+    def __init__(self, title, item_id, extended_id, service_id, **kwargs):
+        content = {'title': title, 'item_id': item_id,
+                   'extended_id': extended_id, 'service_id': service_id}
+        content.update(kwargs)
+        super(MSContainer, self).__init__(**content)
+
+
+# FIXME NEW
+class MSGenre(MusicServiceItem):
+    """Class that represents a Music Service Genre"""
+
+    # Since MSGenre cannot produce didl_metadata, they are not strictly
+    # required, but it makes sense to require them anyway, since they are the
+    # fields that that describe the item
+    # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
+    required_fields = ['title', 'item_id', 'extended_id', 'service_id']
+
+    def __init__(self, title, item_id, extended_id, service_id, **kwargs):
+        content = {'title': title, 'item_id': item_id,
+                   'extended_id': extended_id, 'service_id': service_id}
+        content.update(kwargs)
+        super(MSGenre, self).__init__(**content)
+
+
+# FIXME. THIS IS A RADIO PROGRAM, FIX THIS UP
+class MSProgram(MusicServiceItem):
+    """Class that represents a Music Service Program"""
+
+    # Since MSProgram cannot produce didl_metadata, they are not strictly
+    # required, but it makes sense to require them anyway, since they are the
+    # fields that that describe the item
+    # IMPORTANT. Keep this list, __init__ args and content in __init__ in sync
+    required_fields = ['title', 'item_id', 'extended_id', 'service_id']
+
+    def __init__(self, title, item_id, extended_id, service_id, **kwargs):
+        content = {'title': title, 'item_id': item_id,
+                   'extended_id': extended_id, 'service_id': service_id}
+        content.update(kwargs)
+        super(MSProgram, self).__init__(**content)
 
 
 DIDL_CLASS_TO_CLASS = {'object.item.audioItem.musicTrack': MLTrack,
@@ -1315,7 +1367,9 @@ DIDL_CLASS_TO_CLASS = {'object.item.audioItem.musicTrack': MLTrack,
 MS_TYPE_TO_CLASS = {'artist': MSArtist, 'album': MSAlbum, 'track': MSTrack,
                     'albumList': MSAlbumList, 'favorites': MSFavorites,
                     'collection': MSCollection, 'playlist': MSPlaylist,
-                    'artistTrackList': MSArtistTracklist}
+                    'artistTrackList': MSArtistTracklist,
+                    'container': MSContainer, 'trackList': MSTracklist,
+                    'genre': MSGenre, 'program': MSProgram}
 
 NS = {
     'dc': 'http://purl.org/dc/elements/1.1/',

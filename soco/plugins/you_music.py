@@ -12,7 +12,8 @@ import requests
 from ..services import MusicServices
 from ..xml import XML
 from ..data_structures import get_ms_item, MSTrack, MSAlbum, MSArtist, \
-    MSAlbumList, MSFavorites, MSCollection, MSPlaylist, MSArtistTracklist
+    MSAlbumList, MSFavorites, MSCollection, MSPlaylist, MSArtistTracklist, \
+    MSContainer, MSTracklist, MSGenre, MSProgram
 from ..utils import really_utf8
 from ..exceptions import SoCoUPnPException, UnknownXMLStructure
 from .__init__ import SoCoPlugin
@@ -289,6 +290,7 @@ class YouMusic(SoCoPlugin):
         and :py:class:`soco.data_structures.MSCollection` elements.
 
         """
+        #print 'Into browse', repr(ms_item)
         # Check for correct service
         if ms_item is not None and ms_item.service_id != self._service_id:
             message = 'This music service item is not for this service'
@@ -330,12 +332,13 @@ class YouMusic(SoCoPlugin):
             if result.tag in [_ns_tag('', 'mediaCollection'),
                               _ns_tag('', 'mediaMetadata')]:
                 # HACKING
-                # from soco.utils import show_xml
-                from soco.data_structures import ns_tag
-                print "##" + result.findtext(ns_tag('ms', 'itemType'))
-                if result.findtext(ns_tag('ms', 'itemType')) in ['container',
-                        'trackList']:
-                    continue
+                from soco.utils import show_xml
+                #show_xml(result)
+                #from soco.data_structures import ns_tag
+                #print "##" + result.findtext(ns_tag('ms', 'itemType'))
+                #if result.findtext(ns_tag('ms', 'itemType')) in ['container',
+                #        'trackList']:
+                #    continue
                 # /HACKING
                 out['item_list'].append(get_ms_item(result, self, parent_id))
         return out
@@ -356,7 +359,7 @@ class YouMusic(SoCoPlugin):
         """
         out = ID_PREFIX[item_class]
         if out:
-            out += item_id
+            out += item_id.replace(':', '%3a')
         return out
 
     @staticmethod
@@ -370,6 +373,11 @@ class YouMusic(SoCoPlugin):
         :py:class:`soco.data_structures.MusicServiceItem`
 
         """
+        #print 'content', item_content
+        #content = item_content.copy()
+        #if hasattr(content['extended_id'], 'replace'):
+        #    content['extended_id'] = content['extended_id'].replace(':', '%3a')
+            
         extension = None
         if 'mime_type' in item_content:
             extension = MIME_TYPE_TO_EXTENSION[item_content['mime_type']]
@@ -521,25 +529,33 @@ EXCEPTION_STR_TO_CODE = {
 }
 SEARCH_PREFIX = '00020064{search_type}:{search}'
 ID_PREFIX = {
-    MSTrack: '00030020',
-    MSAlbum: '0004002c',
+    MSTrack: '00030020',  # Confirmed
+    MSAlbum: '0004006c', # Was '0004002c', confirmed
     MSArtist: '10050024',
     MSAlbumList: '000d006c',
     MSPlaylist: '0006006c',
     MSArtistTracklist: '100f006c',
     MSFavorites: None,  # This one is unknown
-    MSCollection: None  # This one is unknown
-
+    MSCollection: None,  # This one is unknown
+    MSContainer: None,  # Investigate, ADDED FROM HERE
+    MSTracklist: '000e006c', # Confirmed
+    MSGenre: None, # Investigate
+    MSProgram: None, # Investigate
 }
 MIME_TYPE_TO_EXTENSION = {
     'audio/aac': 'mp4'
 }
 URIS = {
+    # Confirmed
     MSTrack: 'x-sonos-http:{item_id}.{extension}?sid={service_id}&flags=32',
+    # Confirmed
     MSAlbum: 'x-rincon-cpcontainer:{extended_id}',
     MSAlbumList: 'x-rincon-cpcontainer:{extended_id}',
     MSPlaylist: 'x-rincon-cpcontainer:{extended_id}',
-    MSArtistTracklist: 'x-rincon-cpcontainer:{extended_id}'
+    # Confirmed
+    MSArtistTracklist: 'x-rincon-cpcontainer:{extended_id}',
+    # Confirmed
+    MSTracklist: 'x-rincon-cpcontainer:{extended_id}'
 }
 NS = {
     's': 'http://schemas.xmlsoap.org/soap/envelope/',
