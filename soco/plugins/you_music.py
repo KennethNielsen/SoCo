@@ -8,6 +8,7 @@ import socket
 import locale
 
 import requests
+from xml.sax.saxutils import escape
 
 from ..services import MusicServices
 from ..xml import XML
@@ -249,10 +250,16 @@ class YouMusic(SoCoPlugin):
             message = 'The requested search {0} is not valid'\
                 .format(search_type)
             raise ValueError(message)
-        # Transform search: tracks -> tracksearch
-        search_type = '{0}earch'.format(search_type)
-        parent_id = SEARCH_PREFIX.format(search_type=search_type,
-                                         search=search)
+        
+        if search_type == 'playlists':
+            search_type = 'MixtapesSearch:MixtapesSearch'
+        else:
+            # Transform search: artists -> ArtistSearch:ArtistSearch
+            search_type = ':'.join([search_type[:-1].title() + 'Search'] * 2)
+
+        parent_id = SEARCH_PREFIX.format(
+            search_type=escape(search_type, {':': '%3a'}),
+            search=search)
 
         # Perform search
         body = self._search_body(search_type, search, start, max_items)
@@ -267,7 +274,7 @@ class YouMusic(SoCoPlugin):
         for element in ['index', 'count', 'total']:
             out[element] = search_result.findtext(_ns_tag('', element))
 
-        if search_type == 'tracksearch':
+        if search_type == 'TrackSearch:TrackSearch':
             item_name = 'mediaMetadata'
         else:
             item_name = 'mediaCollection'
@@ -295,6 +302,11 @@ class YouMusic(SoCoPlugin):
         if ms_item is not None and ms_item.service_id != self._service_id:
             message = 'This music service item is not for this service'
             raise ValueError(message)
+
+        # Browsing a track returns and unknown error, we don't want to catch
+        # that, so prevent browsing it in the first place
+        if ms_item is not None and ms_item.__class__ is MSTrack:
+            return None
 
         # Form HTTP body and set parent_id
         if ms_item:
@@ -341,6 +353,10 @@ class YouMusic(SoCoPlugin):
                 #    continue
                 # /HACKING
                 out['item_list'].append(get_ms_item(result, self, parent_id))
+
+        if out['count'] == 0:
+            return None
+
         return out
 
     @staticmethod
@@ -506,7 +522,11 @@ class YouMusic(SoCoPlugin):
             error_dom = XML.fromstring(xml_error)
             fault = error_dom.find('.//' + _ns_tag('s', 'Fault'))
             error_description = fault.find('faultstring').text
-            error_code = EXCEPTION_STR_TO_CODE[error_description]
+            try:
+                print 'error_desc', error_description
+                error_code = EXCEPTION_STR_TO_CODE[error_description]
+            except KeyError:
+                error_code = -1
             message = 'UPnP Error {0} received: {1} from {2}'.format(
                 error_code, error_description, self._url)
             raise SoCoUPnPException(
@@ -521,13 +541,12 @@ SOAP_ACTION = {
     'get_metadata': '"http://www.sonos.com/Services/1.1#getMetadata"',
     'search': '"http://www.sonos.com/Services/1.1#search"'
 }
-# Note UPnP exception 802 while trying to add a Wimp track indicates that these
-# are tracks that not available in Wimp. Do something with that.
 EXCEPTION_STR_TO_CODE = {
-    'unknown': 20000,
-    'ItemNotFound': 20001
+    #'unknown': 20000,
+    'The item was not found.': 20001,
+    'An unknown service error occurred.': 80000,
 }
-SEARCH_PREFIX = '00020064{search_type}:{search}'
+SEARCH_PREFIX = '00020000{search_type}:{search}'
 ID_PREFIX = {
     MSTrack: '00030020',  # Confirmed
     MSAlbum: '0004006c', # Was '0004002c', confirmed
@@ -537,7 +556,7 @@ ID_PREFIX = {
     MSArtistTracklist: '100f006c',
     MSFavorites: None,  # This one is unknown
     MSCollection: None,  # This one is unknown
-    MSContainer: None,  # Investigate, ADDED FROM HERE
+    MSContainer: '1008006c', # Confirmed, ADDED FROM HERE
     MSTracklist: '000e006c', # Confirmed
     MSGenre: None, # Investigate
     MSProgram: None, # Investigate
@@ -555,7 +574,9 @@ URIS = {
     # Confirmed
     MSArtistTracklist: 'x-rincon-cpcontainer:{extended_id}',
     # Confirmed
-    MSTracklist: 'x-rincon-cpcontainer:{extended_id}'
+    MSTracklist: 'x-rincon-cpcontainer:{extended_id}',
+    # Confirmed
+    MSContainer: 'x-rincon-cpcontainer:{extended_id}',
 }
 NS = {
     's': 'http://schemas.xmlsoap.org/soap/envelope/',

@@ -1317,6 +1317,12 @@ class MSContainer(MusicServiceItem):
         content.update(kwargs)
         super(MSContainer, self).__init__(**content)
 
+    @property
+    def uri(self):
+        """Return the URI"""
+        # x-rincon-cpcontainer:0004002calbumid_22757081
+        return self.content['uri']
+
 
 # FIXME NEW
 class MSGenre(MusicServiceItem):
