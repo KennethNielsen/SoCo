@@ -686,7 +686,7 @@ class DidlAudioBroadcast(DidlAudioItem):
     )
 
 
-class DidlAudioBroadcastSonosFavorite(DidlAudioBroadcast):
+class DidlAudioBroadcastFavorite(DidlAudioBroadcast):
 
     """Class that represents an audio broadcast sonos favorite."""
 
