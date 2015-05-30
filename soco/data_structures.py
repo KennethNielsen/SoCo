@@ -40,8 +40,8 @@ def to_didl_string(*args):
         *args (DidlObject): One or more DidlObject (or subclass) instances
 
     Returns:
-        str: A unicode string of the form <DIDL-Lite ...>...</DIDL-Lite>
-            representing the instances
+        bytes: A utf-8 encoded byte string on the form
+            <DIDL-Lite ...>...</DIDL-Lite> representing the instances
     """
     didl = XML.Element(
         'DIDL-Lite',
@@ -52,7 +52,7 @@ def to_didl_string(*args):
         })
     for arg in args:
         didl.append(arg.to_element())
-    return XML.tostring(didl)
+    return XML.tostring(didl, encoding='utf-8')
 
 
 def from_didl_string(string):
