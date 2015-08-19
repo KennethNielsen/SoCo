@@ -263,11 +263,11 @@ class EventServerThread(threading.Thread):
         # Start the server on the local IP at port 1400 (default).
         # Handling of requests is delegated to instances of the
         # EventNotifyHandler class
-        listener = EventServer(self.address, EventNotifyHandler)
-        log.info("Event listener running on %s", listener.server_address)
+        self.listener = EventServer(self.address, EventNotifyHandler)
+        log.info("Event listener running on %s", self.listener.server_address)
         # Listen for events untill told to stop
         while not self.stop_flag.is_set():
-            listener.handle_request()
+            self.listener.handle_request()
 
 
 class EventListener(object):
@@ -599,3 +599,29 @@ _sid_to_service = weakref.WeakValueDictionary()
 #       queue = _sid_to_event_queue[sid]
 _sid_to_event_queue_lock = threading.Lock()
 _sid_to_service_lock = threading.Lock()
+
+
+def reset_event_listener(waittime=4.0):
+    """Reset the event listener, will be necessary e.g. after a network
+    change
+
+    Args:
+        waittime (float): Optional time to wait after deleting the
+            event listener to allow the sockets to settle down
+    """
+    global event_listener
+    event_listener._listener_thread.listener.socket.shutdown(socket.SHUT_RDWR)
+    event_listener._listener_thread.listener.socket.close()
+    event_listener = EventListener()
+
+    time.sleep(waittime)
+
+    # Reset mappings
+    global _sid_to_event_queue, _sid_to_service
+    _sid_to_event_queue = weakref.WeakValueDictionary()
+    _sid_to_service = weakref.WeakValueDictionary()
+
+    # Reset locks
+    global _sid_to_event_queue_lock, _sid_to_service_lock
+    _sid_to_event_queue_lock = threading.Lock()
+    _sid_to_service_lock = threading.Lock()
