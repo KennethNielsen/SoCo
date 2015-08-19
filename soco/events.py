@@ -526,10 +526,18 @@ class Subscription(object):
             self.service.base_url + self.service.event_subscription_url,
             self.sid)
 
-    def unsubscribe(self):
+    def unsubscribe(self, timeout=None):
         """Unsubscribe from the service's events
 
         Once unsubscribed, a Subscription instance should not be reused
+
+        Args:
+            timeout (float): Set a timeout on the unsubscribe request (default
+                is None. If the request times out, it will be assumed to be due
+                to a network change and the rest of the clean up will continue
+                as if the request had succeded. NOTE that this may bring the
+                SoCo subscriptions out of sync with the ones that are
+                registered on the units.
 
         """
         # Trying to unsubscribe if already unsubscribed, or not yet
@@ -546,11 +554,16 @@ class Subscription(object):
         headers = {
             'SID': self.sid
         }
-        response = requests.request(
-            'UNSUBSCRIBE',
-            self.service.base_url + self.service.event_subscription_url,
-            headers=headers)
-        response.raise_for_status()
+        try:
+            response = requests.request(
+                'UNSUBSCRIBE',
+                self.service.base_url + self.service.event_subscription_url,
+                headers=headers,
+                timeout=timeout)
+        except requests.exceptions.ConnectTimeout:
+            pass
+        else:
+            response.raise_for_status()
         self.is_subscribed = False
         self._timestamp = None
         log.info(
