@@ -612,3 +612,34 @@ _sid_to_service = weakref.WeakValueDictionary()
 #       queue = _sid_to_event_queue[sid]
 _sid_to_event_queue_lock = threading.Lock()
 _sid_to_service_lock = threading.Lock()
+
+
+def reset_event_listener(wait_after_shutdown=0, shutdown_in_thread=False):
+    """Reset the event listener
+
+    Args:
+        wait_after_shutdown (float): Wait this long after shutting down the
+            EventListener. This may be useful to allow sockets to be freed by
+            the system
+        shutdown_in_thread (bool): Whether the EventListener should be shut
+            down in a separate thread (useful if it is expected to block e.g.
+            due to a network change.
+    """
+    if shutdown_in_thread:
+        threading.Thread(target=event_listener.stop).start()
+    else:
+        event_listener.stop()
+
+    time.sleep(wait_after_shutdown)
+
+    # Reset sid mappings
+    _sid_to_event_queue.clear()
+    _sid_to_service.clear()
+
+    # Re-initialize locks
+    global _sid_to_event_queue_lock, _sid_to_service_lock
+    _sid_to_event_queue_lock = threading.Lock()
+    _sid_to_service_lock = threading.Lock()
+    
+    global event_listener
+    event_listener = EventListener()
