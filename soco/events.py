@@ -538,12 +538,12 @@ class Subscription(object):
         Once unsubscribed, a Subscription instance should not be reused
 
         Args:
-            timeout (float): Set a timeout on the unsubscribe request (default
-                is None. If the request times out, it will be assumed to be due
-                to a network change and the rest of the clean up will continue
-                as if the request had succeded. NOTE that this may bring the
-                SoCo subscriptions out of sync with the ones that are
-                registered on the units.
+            timeout (float): Set a timeout (in seconds) on the unsubscribe
+                request (default is None. If the request times out, it will be
+                assumed to be due to a network change and the rest of the
+                clean up will continue as if the request had succeded. NOTE
+                that this may bring the SoCo subscriptions out of sync with
+                the ones that are registered on the units.
 
         """
         # Trying to unsubscribe if already unsubscribed, or not yet
@@ -624,8 +624,9 @@ def set_event_listener_timeout(timeout):
     """Sets the eventlistener timeout
 
     Args:
-        timeout (float): The timeout on waiting for requests. This is also the
-            time it will take to shut down the server.
+        timeout (float): The timeout, in seconds, the server will wait for
+            requests each iteration. This is also the time it will take to
+            shut down the server.
 
     Must be called after making a subscription
     """
@@ -644,4 +645,5 @@ def stop_event_listener():
     if len(_sid_to_event_queue) + len(_sid_to_service) > 0:
         raise SoCoException('Cannot reset before all subscriptions have been '
                             'un-subscribed')
-    event_listener.stop()
+    if event_listener.is_running:
+        event_listener.stop()
