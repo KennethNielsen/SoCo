@@ -258,16 +258,18 @@ class EventServerThread(threading.Thread):
         self.stop_flag = threading.Event()
         #: The (ip, port) address on which the server should listen
         self.address = address
+        self.listener = None
 
     def run(self):
         # Start the server on the local IP at port 1400 (default).
         # Handling of requests is delegated to instances of the
         # EventNotifyHandler class
-        listener = EventServer(self.address, EventNotifyHandler)
-        log.info("Event listener running on %s", listener.server_address)
+        self.listener = EventServer(self.address, EventNotifyHandler)
+        log.info("Event listener running on %s", self.listener.server_address)
         # Listen for events untill told to stop
         while not self.stop_flag.is_set():
-            listener.handle_request()
+            self.listener.handle_request()
+        self.listener.server_close()
 
 
 class EventListener(object):
@@ -318,14 +320,18 @@ class EventListener(object):
         """Stop the event listener"""
         # Signal the thread to stop before handling the next request
         self._listener_thread.stop_flag.set()
-        # Send a dummy request in case the http server is currently listening
-        try:
-            urlopen(
-                'http://%s:%s/' % (self.address[0], self.address[1]))
-        except URLError:
-            # If the server is already shut down, we receive a socket error,
-            # which we ignore.
-            pass
+        # If the server is set to timeout on requests, it will stop on its own
+        # and we need not send it a dummy request
+        if self._listener_thread.listener.timeout is None:
+            # Send a dummy request in case the http server is currently
+            # listening
+            try:
+                urlopen(
+                    'http://%s:%s/' % (self.address[0], self.address[1]))
+            except URLError:
+                # If the server is already shut down, we receive a socket
+                # error, which we ignore.
+                pass
         # wait for the thread to finish
         self._listener_thread.join()
         self.is_running = False
@@ -614,32 +620,28 @@ _sid_to_event_queue_lock = threading.Lock()
 _sid_to_service_lock = threading.Lock()
 
 
-def reset_event_listener(wait_after_shutdown=0, shutdown_in_thread=False):
-    """Reset the event listener
+def set_event_listener_timeout(timeout):
+    """Sets the eventlistener timeout
 
     Args:
-        wait_after_shutdown (float): Wait this long after shutting down the
-            EventListener. This may be useful to allow sockets to be freed by
-            the system
-        shutdown_in_thread (bool): Whether the EventListener should be shut
-            down in a separate thread (useful if it is expected to block e.g.
-            due to a network change.
+        timeout (float): The timeout on waiting for requests. This is also the
+            time it will take to shut down the server.
+
+    Must be called after making a subscription
     """
-    if shutdown_in_thread:
-        threading.Thread(target=event_listener.stop).start()
-    else:
-        event_listener.stop()
+    try:
+        event_listener._listener_thread.listener.timeout = timeout
+    except AttributeError:
+        raise SoCoException('Cannot set event listener timeout until after '
+                            'a subscription has been mad')
 
-    time.sleep(wait_after_shutdown)
 
-    # Reset sid mappings
-    _sid_to_event_queue.clear()
-    _sid_to_service.clear()
+def stop_event_listener():
+    """Stop the event listener
 
-    # Re-initialize locks
-    global _sid_to_event_queue_lock, _sid_to_service_lock
-    _sid_to_event_queue_lock = threading.Lock()
-    _sid_to_service_lock = threading.Lock()
-    
-    global event_listener
-    event_listener = EventListener()
+    Can be restarted by making a new subscription
+    """
+    if len(_sid_to_event_queue) + len(_sid_to_service) > 0:
+        raise SoCoException('Cannot reset before all subscriptions have been '
+                            'un-subscribed')
+    event_listener.stop()
