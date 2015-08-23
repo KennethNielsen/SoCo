@@ -636,6 +636,12 @@ def set_event_listener_timeout(timeout):
         raise SoCoException('Cannot set event listener timeout until after '
                             'a subscription has been mad')
 
+    try:
+        urlopen('http://%s:%s/' % (event_listener.address[0],
+                                   event_listener.address[1]))
+    except URLError:
+        pass
+
 
 def stop_event_listener():
     """Stop the event listener
