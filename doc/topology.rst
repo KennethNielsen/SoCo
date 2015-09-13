@@ -1,3 +1,5 @@
+.. _speaker_topologies:
+
 Speaker Topologies
 ------------------
 

@@ -1,3 +1,5 @@
+.. _upnp_services:
+
 UPnP Services
 =============
 
