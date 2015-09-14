@@ -7,7 +7,7 @@ New Features
 * All information about queue and music library items, like e.g. the
   title and album of a track, are now included in data structure classes
   instead of dictionaries (the classes are available in the
-  :ref:`data_structure_mod` sub-module ). This advantages of this
+  :ref:`soco-datastructures-mod` sub-module ). This advantages of this
   approach are:
 
   * The type of the item is identifiable by its class name
