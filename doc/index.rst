@@ -49,6 +49,7 @@ Contents
    :maxdepth: 2
 
    getting_started
+   examples
    topology
    events
    services
